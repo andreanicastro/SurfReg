@@ -15,5 +15,5 @@ endif()
 
 set(CMAKE_CXX_FLAGS "-O3 -msse2 -msse3")
 
-add_executable (SurfReg SurfReg.cpp)
+add_executable (SurfReg src/SurfReg.cpp)
 target_link_libraries (SurfReg  ${Boost_LIBRARIES} ${PCL_LIBRARIES})
