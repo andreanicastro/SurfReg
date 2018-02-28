@@ -116,38 +116,80 @@ int main(int argc, char ** argv)
     int trajectory = 0;
     pcl::console::parse_argument(argc, argv, "-t", trajectory);
 
-    Eigen::Matrix4f trans;
 
-    if(trajectory == 0)
-    {
-        trans << 0.999759, -0.000287637, 0.0219655, -1.36022,
-                 0.000160294, 0.999983, 0.00579897, 1.48382,
-                 0.0219668, 0.00579404, -0.999742, 1.44256,
-                 0, 0, 0, 1;
-    }
-    else if(trajectory == 1)
-    {
-        trans << 0.99975, -0.00789018, 0.0209474, -0.0976324,
-                 0.00789931, 0.999969, -0.000353282, 1.27618,
-                 0.0209439, -0.000518671, -0.999781, 0.0983734,
-                 0, 0, 0, 1;
-    }
-    else if(trajectory == 2)
-    {
-        trans << 0.999822, 0.0034419, 0.0185526, -0.786316,
-                 -0.00350915, 0.999987, 0.00359374, 1.28433,
-                 0.01854, 0.00365819, -0.999821, 1.45583,
-                 0, 0, 0, 1;
-    }
-    else if(trajectory == 3)
-    {
-        trans << 0.999778, -0.000715914, 0.0210893, -1.13311,
-                 0.000583688, 0.99998, 0.0062754, 1.26825,
-                 0.0210934, 0.0062617, -0.999758, 0.901866,
-                 0, 0, 0, 1;
-    }
+    //if(trajectory == 0)
+    //{
+    //    trans << 0.999759, -0.000287637, 0.0219655, -1.36022,
+    //             0.000160294, 0.999983, 0.00579897, 1.48382,
+    //             0.0219668, 0.00579404, -0.999742, 1.44256,
+    //             0, 0, 0, 1;
+    //}
+    //else if(trajectory == 1)
+    //{
+    //    trans << 0.99975, -0.00789018, 0.0209474, -0.0976324,
+    //             0.00789931, 0.999969, -0.000353282, 1.27618,
+    //             0.0209439, -0.000518671, -0.999781, 0.0983734,
+    //             0, 0, 0, 1;
+    //}
+    //else if(trajectory == 2)
+    //{
+    //    trans << 0.999822, 0.0034419, 0.0185526, -0.786316,
+    //             -0.00350915, 0.999987, 0.00359374, 1.28433,
+    //             0.01854, 0.00365819, -0.999821, 1.45583,
+    //             0, 0, 0, 1;
+    //}
+    //else if(trajectory == 3)
+    //{
+    //    trans << 0.999778, -0.000715914, 0.0210893, -1.13311,
+    //             0.000583688, 0.99998, 0.0062754, 1.26825,
+    //             0.0210934, 0.0062617, -0.999758, 0.901866,
+    //             0, 0, 0, 1;
+    //}
 
-    pcl::transformPointCloud(*rCloud, *rCloud, trans);
+    // alingment transformation computed with pcl 
+    Eigen::Matrix4f T_m_r;
+    T_m_r << 0.996831893921, -0.059467103332,  0.052818551660, -3.029283523560,
+            -0.054837621748, -0.994858026505, -0.085148766637,  1.524040937424,
+             0.057610511780,  0.081982567906, -0.994967281818,  2.343420743942,
+             0.000000000000,  0.000000000000,  0.000000000000,  1.000000000000;
+    Eigen::Matrix4f T_mcoarse_mfine; // refinement transformation 
+    T_mcoarse_mfine <<  0.998420596123, -0.045958295465,  0.032309494913, -0.063110567629,
+                        0.048849184066,  0.994253396988, -0.095260985196, -0.146721497178,
+                       -0.027745807543,  0.096688896418,  0.994928121567,  0.065588399768,
+                        0.000000000000,  0.000000000000,  0.000000000000,  1.000000000000;
+
+    T_m_r = T_mcoarse_mfine*T_m_r;
+    pcl::transformPointCloud(*rCloud, *rCloud, T_m_r);
+
+    std::cout << "Final transformation:\n" << T_m_r << std::endl;
+    std::cout << "Determinant of rotation matrix: " << T_m_r.block<3,3>(0,0).determinant() 
+        << std::endl;
+
+    Eigen::Matrix4f toRhs;
+    toRhs << 1,  0, 0, 0,
+             0, -1, 0, 0,
+             0,  0, 1, 0,
+             0,  0, 0, 1;
+    
+    
+    pcl::transformPointCloud(*mCloud, *mCloud, toRhs);
+
+    // compute transformation from what we now of the reference frames
+    Eigen::Matrix4f T_m_c_wisdom = Eigen::Matrix4f::Identity();
+    T_m_c_wisdom(2,3) = -2.25;
+    T_m_c_wisdom = toRhs*T_m_c_wisdom;
+    
+    Eigen::Matrix4f T_v_c = Eigen::Matrix4f::Identity();
+    T_v_c(0,3) = 0.34;
+    T_v_c(1,3) = 0.5;
+    T_v_c(2,3) = 0.24;
+    
+    Eigen::Matrix4f T_m_v = T_m_c_wisdom*T_v_c.inverse();
+    std::cout << "My computed transformation:\n" << T_m_v << std::endl;
+    std::cout << "Determinant rotation matrix: " << T_m_v.block<3,3>(0,0).determinant()
+        << std::endl;
+    std::cout << "Difference between pcl and mine:\n" << T_m_v*T_m_r.inverse()
+        << std::endl;
 
     float radius = 10.0f;
     float theta = 0.0f;
